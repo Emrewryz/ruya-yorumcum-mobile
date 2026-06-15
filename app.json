@@ -2,29 +2,57 @@
   "expo": {
     "name": "ruya-yorumcum-mobile",
     "slug": "ruya-yorumcum-mobile",
-    "version": "1.0.0",
+    "scheme": "ruyayorumcum",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
+      "bundleIdentifier": "app.ruyayorumcum.mobile",
       "supportsTablet": true
     },
     "android": {
+      "package": "com.ruyayorumcum.v2",
+      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "com.google.android.gms.permission.AD_ID",
+        "com.android.vending.BILLING"
+      ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/icon.png"
+    },
+    "plugins": [
+      "expo-notifications",
+      "expo-asset",
+      "@react-native-google-signin/google-signin",
+      "expo-router",
+      "expo-web-browser",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        }
+      ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f50ae273-2ac0-4a36-a446-4d5d0c8c1faf"
+      }
     }
   }
 }

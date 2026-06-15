@@ -1,0 +1,42 @@
+
+C:\Users\fikri\RuyaYorumcum\ruya-yorumcum-mobile
+├── app
+|  ├── (auth)
+|  |  ├── login.tsx
+|  |  └── register.tsx
+|  ├── credit-shop.tsx
+|  ├── dictionary-detail.tsx
+|  ├── dictionary.tsx
+|  ├── index.tsx
+|  ├── onboarding.tsx
+|  ├── settings.tsx
+|  ├── test-detail.tsx
+|  ├── tests.tsx
+|  └── _layout.tsx
+├── app.json
+├── babel.config.js
+├── components
+|  ├── AnimatedMessage.tsx
+|  ├── Drawer.tsx
+|  ├── FloatingInput.tsx
+|  └── PaywallCard.tsx
+├── constants
+├── global.css
+├── lib
+|  └── supabase.ts
+├── metro.config.js
+├── nativewind-env.d.ts
+├── package-lock.json
+├── package.json
+├── tailwind.config.js
+├── tam_proje_yapisi.txt
+├── tsconfig.json
+└── types
+   └── database.ts
+
+directory: 2002 file: 6138
+
+ignored: directory (73)
+
+
+[2K[1G
