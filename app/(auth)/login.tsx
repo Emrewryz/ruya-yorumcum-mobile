@@ -24,30 +24,26 @@ const g = StyleSheet.create({
   txt:  { fontSize: 13, fontWeight: "800", color: "#4285F4" },
 });
 
-export default function RegisterScreen() {
-  const insets    = useSafeAreaInsets();
-  const passRef   = useRef<TextInput>(null);
-  const pass2Ref  = useRef<TextInput>(null);
+export default function LoginScreen() {
+  const insets  = useSafeAreaInsets();
+  const passRef = useRef<TextInput>(null);
 
   const [email,      setEmail]      = useState("");
   const [password,   setPass]       = useState("");
-  const [password2,  setPass2]      = useState("");
   const [showPass,   setShowPass]   = useState(false);
   const [loading,    setLoading]    = useState(false);
   const [googleLoad, setGoogleLoad] = useState(false);
   const [error,      setError]      = useState<string | null>(null);
 
-  const handleRegister = async () => {
+  const handleLogin = async () => {
     Keyboard.dismiss();
     if (!email.trim() || !password) return;
-    if (password !== password2) { setError("Şifreler eşleşmiyor."); return; }
-    if (password.length < 6)    { setError("Şifre en az 6 karakter olmalı."); return; }
     setLoading(true); setError(null);
-    const { error: e } = await supabase.auth.signUp({
+    const { error: e } = await supabase.auth.signInWithPassword({
       email: email.trim(), password,
     });
     if (e) { setError(e.message); setLoading(false); return; }
-    router.replace("/onboarding");
+    router.replace("/");
   };
 
   const handleGoogle = async () => {
@@ -58,7 +54,7 @@ export default function RegisterScreen() {
       setGoogleLoad(false);
       return;
     }
-    // Yeni kullanıcıysa onboarding'e, mevcutsa ana sayfaya
+    // Giriş yapınca ana sayfaya veya yeni kullanıcıysa onboarding'e yönlendir
     router.replace(result.isNewUser ? "/onboarding" : "/");
   };
 
@@ -82,8 +78,8 @@ export default function RegisterScreen() {
             <Text style={s.logoSub}>Yapay zeka ile rüya analizi</Text>
           </View>
 
-          <Text style={s.title}>Hesap Oluştur</Text>
-          <Text style={s.subtitle}>3 kredi hoş geldin bonusu ile başla.</Text>
+          <Text style={s.title}>Tekrar Hoş Geldin</Text>
+          <Text style={s.subtitle}>Rüyalarının şifresini çözmeye devam et.</Text>
 
           {/* Google — beyaz */}
           <TouchableOpacity
@@ -96,7 +92,7 @@ export default function RegisterScreen() {
               ? <ActivityIndicator color="#18181b" size="small" />
               : <>
                   <GoogleIcon />
-                  <Text style={s.googleTxt}>Google ile Kayıt Ol</Text>
+                  <Text style={s.googleTxt}>Google ile Giriş Yap</Text>
                 </>
             }
           </TouchableOpacity>
@@ -133,11 +129,11 @@ export default function RegisterScreen() {
                 ref={passRef}
                 value={password}
                 onChangeText={setPass}
-                placeholder="En az 6 karakter"
+                placeholder="Şifrenizi girin"
                 placeholderTextColor="#a1a1aa"
                 secureTextEntry={!showPass}
-                returnKeyType="next"
-                onSubmitEditing={() => pass2Ref.current?.focus()}
+                returnKeyType="done"
+                onSubmitEditing={handleLogin}
                 style={s.input}
               />
               <TouchableOpacity
@@ -152,52 +148,28 @@ export default function RegisterScreen() {
             </View>
           </View>
 
-          {/* Şifre tekrar */}
-          <View style={s.field}>
-            <Text style={s.fieldLabel}>ŞİFRE TEKRAR</Text>
-            <TextInput
-              ref={pass2Ref}
-              value={password2}
-              onChangeText={setPass2}
-              placeholder="Şifrenizi tekrar girin"
-              placeholderTextColor="#a1a1aa"
-              secureTextEntry={!showPass}
-              returnKeyType="done"
-              onSubmitEditing={handleRegister}
-              style={s.input}
-            />
-          </View>
-
           {error && <Text style={s.errorTxt}>{error}</Text>}
 
-          {/* Kayıt Butonu */}
+          {/* Giriş Butonu */}
           <TouchableOpacity
-            onPress={handleRegister}
-            disabled={loading || !email.trim() || !password || !password2}
+            onPress={handleLogin}
+            disabled={loading || !email.trim() || !password}
             activeOpacity={0.85}
-            style={[s.submitBtn, (loading || !email.trim() || !password || !password2) && { opacity: 0.4 }]}
+            style={[s.submitBtn, (loading || !email.trim() || !password) && { opacity: 0.4 }]}
           >
             {loading
               ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={s.submitTxt}>Hesap Oluştur</Text>
+              : <Text style={s.submitTxt}>Giriş Yap</Text>
             }
           </TouchableOpacity>
 
-          {/* Giriş yap */}
+          {/* Kayıt ol */}
           <View style={s.switchRow}>
-            <Text style={s.switchTxt}>Zaten hesabın var mı?</Text>
-            <TouchableOpacity onPress={() => router.replace("/(auth)/login")}>
-              <Text style={s.switchLink}>Giriş Yap</Text>
+            <Text style={s.switchTxt}>Hesabın yok mu?</Text>
+            <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
+              <Text style={s.switchLink}>Kayıt Ol</Text>
             </TouchableOpacity>
           </View>
-
-          <Text style={s.terms}>
-            Kayıt olarak{" "}
-            <Text style={s.termsLink}>Kullanım Koşulları</Text>
-            {" "}ve{" "}
-            <Text style={s.termsLink}>Gizlilik Politikası</Text>
-            {"'"}nı kabul etmiş olursunuz.
-          </Text>
 
         </ScrollView>
       </KeyboardAvoidingView>
@@ -240,6 +212,4 @@ const s = StyleSheet.create({
   switchRow:   { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 16 },
   switchTxt:   { fontSize: 14, color: "#71717a" },
   switchLink:  { fontSize: 14, fontWeight: "700", color: "#18181b" },
-  terms:       { fontSize: 12, color: "#a1a1aa", textAlign: "center", lineHeight: 18 },
-  termsLink:   { fontWeight: "600", color: "#52525b" },
 });

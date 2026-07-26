@@ -3,13 +3,13 @@
  *
  * Reklam izle butonu buraya entegre edildi.
  * Spam koruması: 3 saat cooldown (AsyncStorage).
- * Header'daki RewardedAdButton tamamen kaldırıldı.
+ * RevenueCat ile Google Play uygulama içi satın alım entegre edildi.
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, Linking, Platform, ActivityIndicator,
+  ScrollView, Platform, ActivityIndicator, Alert
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -18,8 +18,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import { supabase } from "@/lib/supabase";
 import { adCooldownLabel, canWatchAd, recordAdWatch } from "@/lib/adUtils";
+import Purchases from "react-native-purchases"; // RevenueCat eklendi
 
-// ─── AdMob güvenli import ─────────────────────────────────────────────────────
+// --- RevenueCat API Anahtarı ---
+const RC_API_KEY = "goog_eIBwqLHklzWSoXCWYzTzhlxTgBt";
+
+// ─── AdMob Güvenli İmport ─────────────────────────────────────────────────────
 
 let RewardedAd: any        = null;
 let RewardedAdEventType: any = null;
@@ -36,34 +40,31 @@ const REWARDED_ID = TestIds
   ? (__DEV__ ? TestIds.REWARDED : (
       Platform.OS === "ios"
         ? "ca-app-pub-XXXX/YOUR_IOS_REWARDED"
-        : "ca-app-pub-XXXX/YOUR_ANDROID_REWARDED"
+        : "ca-app-pub-1582674739139734/4581251133 "
     ))
   : "";
 
 
-// ─── Paketler ─────────────────────────────────────────────────────────────────
+// ─── Paketler (Google Play Product ID'leri ile) ───────────────────────────────
 
 const PACKAGES = [
   {
-    key: "baslangic", icon: Zap, name: "Başlangıç",
+    id: "paket_baslangic_10", icon: Zap, name: "Başlangıç",
     credits: 10, price: 39, oldPrice: null,
     badge: null,
     features: ["Temel Rüya Yorumu", "Standart İşlem Hızı"],
-    url: "https://www.shopier.com/ruyayorumcumai/43928759",
   },
   {
-    key: "populer", icon: Star, name: "Popüler",
+    id: "paket_populer_30", icon: Star, name: "Popüler",
     credits: 30, price: 89, oldPrice: 119,
     badge: "En Çok Tercih Edilen",
     features: ["Detaylı İslami Tahlil", "Psikolojik Analiz", "Öncelikli İşlem Sırası"],
-    url: "https://www.shopier.com/ruyayorumcumai/43369308",
   },
   {
-    key: "bilge", icon: Crown, name: "Bilge",
+    id: "paket_bilge_100", icon: Crown, name: "Bilge",
     credits: 100, price: 249, oldPrice: 390,
     badge: "En Avantajlı",
     features: ["Sınırsız Detaylı Tahlil", "Sembol Sözlüğü Erişimi", "VIP İşlem Hızı"],
-    url: "https://www.shopier.com/ruyayorumcumai/43369409",
   },
 ];
 
@@ -72,10 +73,9 @@ const PACKAGES = [
 function AdRewardSection() {
   const [adLoaded,    setAdLoaded]    = useState(false);
   const [watching,    setWatching]    = useState(false);
-  const [cooldownLeft, setCooldown]   = useState<string | null>(null); // "2s 30d" formatı
+  const [cooldownLeft, setCooldown]   = useState<string | null>(null);
   const adRef = useRef<any>(null);
 
-  // Cooldown kontrolü
   const checkCooldown = useCallback(async () => {
     const label = await adCooldownLabel();
     setCooldown(label);
@@ -83,11 +83,10 @@ function AdRewardSection() {
 
   useEffect(() => {
     checkCooldown();
-    const interval = setInterval(checkCooldown, 30000); // 30sn'de bir kontrol
+    const interval = setInterval(checkCooldown, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  // Rewarded Ad kurulumu
   useEffect(() => {
     if (!RewardedAd || !REWARDED_ID) return;
 
@@ -104,7 +103,6 @@ function AdRewardSection() {
     const unsubEarned = ad.addAdEventListener(
       RewardedAdEventType.EARNED_REWARD,
       async () => {
-        // Krediyi yükle
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
@@ -115,35 +113,26 @@ function AdRewardSection() {
           p_description:  "Reklam ödülü",
         });
 
-        // Cooldown kaydet
         await recordAdWatch();
-
         setWatching(false);
         setAdLoaded(false);
         checkCooldown();
-
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-
-        // Bir sonraki reklam için yeniden yükle
         ad.load();
       },
     );
 
     ad.load();
-
     return () => { unsubLoaded(); unsubEarned(); };
   }, []);
 
   const handleWatch = useCallback(async () => {
     const ok = await canWatchAd();
     if (!ok || cooldownLeft) { checkCooldown(); return; }
-    if (!RewardedAd || !REWARDED_ID) {
-return;
-    }
-    if (!adLoaded || !adRef.current) {
-return;
-    }
+    if (!RewardedAd || !REWARDED_ID) return;
+    if (!adLoaded || !adRef.current) return;
+    
     setWatching(true);
     adRef.current.show();
   }, [adLoaded, cooldownLeft]);
@@ -151,14 +140,14 @@ return;
   const isDisabled = !!cooldownLeft || watching;
 
   return (
-    <View style={ad.wrap}>
-      <View style={ad.left}>
-        <View style={ad.iconWrap}>
+    <View style={adStyles.wrap}>
+      <View style={adStyles.left}>
+        <View style={adStyles.iconWrap}>
           <Gift size={18} color="#18181b" strokeWidth={1.5} />
         </View>
         <View>
-          <Text style={ad.title}>Ücretsiz Kredi Kazan</Text>
-          <Text style={ad.sub}>
+          <Text style={adStyles.title}>Ücretsiz Kredi Kazan</Text>
+          <Text style={adStyles.sub}>
             {cooldownLeft
               ? `Sonraki reklam: ${cooldownLeft}`
               : "Kısa bir reklam izle, 1 kredi kazan"}
@@ -170,11 +159,11 @@ return;
         onPress={handleWatch}
         disabled={isDisabled}
         activeOpacity={0.8}
-        style={[ad.btn, isDisabled && ad.btnDisabled]}
+        style={[adStyles.btn, isDisabled && adStyles.btnDisabled]}
       >
         {watching
           ? <ActivityIndicator color="#fff" size="small" />
-          : <Text style={ad.btnTxt}>
+          : <Text style={adStyles.btnTxt}>
               {cooldownLeft ? "Bekleniyor" : "İzle"}
             </Text>
         }
@@ -183,7 +172,7 @@ return;
   );
 }
 
-const ad = StyleSheet.create({
+const adStyles = StyleSheet.create({
   wrap:       { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#fff", borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: "#e4e4e7", shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 },
   left:       { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
   iconWrap:   { width: 38, height: 38, borderRadius: 10, backgroundColor: "#f4f4f5", alignItems: "center", justifyContent: "center" },
@@ -197,11 +186,88 @@ const ad = StyleSheet.create({
 // ─── Ana Ekran ────────────────────────────────────────────────────────────────
 
 export default function CreditShopScreen() {
+  const [isPurchasing, setIsPurchasing] = useState(false);
+
+  // RevenueCat Başlatma ve Kullanıcı Tanıtma
+  useEffect(() => {
+    const setupPurchases = async () => {
+      try {
+        if (Platform.OS === "android") {
+          Purchases.configure({ apiKey: RC_API_KEY });
+        }
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          // Satın alımların Supabase kullanıcısı ile eşleşmesi için:
+          await Purchases.logIn(user.id);
+        }
+      } catch (error) {
+        console.error("RevenueCat Setup Error:", error);
+      }
+    };
+    setupPurchases();
+  }, []);
+
+  // Satın Alma İşlemi
+  // Satın Alma İşlemi
+  const handlePurchase = async (productId: string, creditAmount: number) => {
+    if (isPurchasing) return;
+    setIsPurchasing(true);
+
+    try {
+      // 1. RevenueCat'ten "Vitrin"i (Offerings) Çek
+      const offerings = await Purchases.getOfferings();
+      
+      // 2. Vitrinde mevcut paketler var mı kontrol et
+      if (offerings.current !== null && offerings.current.availablePackages.length !== 0) {
+        
+        // 3. Tıkladığın butona (productId) ait paketi vitrinde bul
+        const packageToBuy = offerings.current.availablePackages.find(
+          (pkg) => pkg.product.identifier === productId
+        );
+
+        if (!packageToBuy) {
+           Alert.alert("Hata", "Bu ürün şu anda vitrinde bulunamadı. Lütfen daha sonra tekrar deneyin.");
+           console.log("Bulunamayan Ürün ID:", productId);
+           return;
+        }
+
+        // 4. Doğrudan paketi (Package) satın al. 
+        const { customerInfo } = await Purchases.purchasePackage(packageToBuy);
+
+        // 5. Ödeme başarılıysa Supabase veritabanına krediyi işle
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.rpc("handle_credit_transaction", {
+            p_user_id:      user.id,
+            p_amount:       creditAmount,
+            p_process_type: "in_app_purchase",
+            p_description:  `Google Play üzerinden ${creditAmount} Kredi satın alımı`,
+          });
+
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Alert.alert("Teşekkürler!", `${creditAmount} kredi başarıyla hesabınıza tanımlandı.`);
+        }
+
+      } else {
+        Alert.alert("Bağlantı Hatası", "Satın alma seçenekleri yüklenemedi. Lütfen internet bağlantınızı kontrol edin.");
+      }
+
+    } catch (error: any) {
+      if (!error.userCancelled) {
+        Alert.alert("Ödeme İptal", "Satın alma işlemi tamamlanamadı veya iptal edildi.");
+        console.log("REVENUECAT HATASI:", error);
+      }
+    } finally {
+      setIsPurchasing(false);
+    }
+  };
+
   return (
     <SafeAreaView style={s.safe} edges={["top"]}>
       <View style={s.header}>
         <Text style={s.title}>Kredi Paketleri</Text>
-        <TouchableOpacity onPress={() => router.back()} style={s.closeBtn}>
+        <TouchableOpacity onPress={() => router.back()} style={s.closeBtn} disabled={isPurchasing}>
           <X size={18} color="#52525b" strokeWidth={1.5} />
         </TouchableOpacity>
       </View>
@@ -221,13 +287,14 @@ export default function CreditShopScreen() {
         {/* Paket kartları */}
         {PACKAGES.map((pkg) => {
           const Icon    = pkg.icon;
-          const popular = pkg.key === "populer";
+          const popular = pkg.id === "paket_populer_30";
           return (
             <TouchableOpacity
-              key={pkg.key}
-              onPress={() => Linking.openURL(pkg.url)}
+              key={pkg.id}
+              onPress={() => handlePurchase(pkg.id, pkg.credits)}
+              disabled={isPurchasing}
               activeOpacity={0.85}
-              style={[s.card, popular && s.cardPopular]}
+              style={[s.card, popular && s.cardPopular, isPurchasing && { opacity: 0.7 }]}
             >
               {pkg.badge && (
                 <View style={[s.badge, popular && s.badgePopular]}>
@@ -286,7 +353,7 @@ export default function CreditShopScreen() {
           <View style={t.shieldRow}>
             <ShieldCheck size={14} color="#10b981" strokeWidth={1.5} />
             <Text style={t.shieldTxt}>
-              256-bit SSL Güvenli Ödeme · Shopier Altyapısı · Anında Teslimat
+              256-bit SSL Güvenli Ödeme · Google Play Altyapısı · Anında Teslimat
             </Text>
           </View>
         </View>

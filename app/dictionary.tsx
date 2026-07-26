@@ -27,7 +27,7 @@ const BANNER_ID = TestIds
   ? (__DEV__ ? TestIds.ADAPTIVE_BANNER : (
       Platform.OS === "ios"
         ? "ca-app-pub-XXXX/YOUR_IOS_BANNER"
-        : "ca-app-pub-XXXX/YOUR_ANDROID_BANNER"
+        : "ca-app-pub-1582674739139734/4585120564"
     ))
   : "";
 
