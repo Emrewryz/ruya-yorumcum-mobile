@@ -63,7 +63,7 @@ export default function FloatingInput({
             value={value}
             onChangeText={onChange}
             placeholder={placeholder}
-            placeholderTextColor="#6b6b6b"
+            placeholderTextColor="#a1a1aa"
             multiline
             maxLength={1000}
             scrollEnabled
@@ -77,7 +77,7 @@ export default function FloatingInput({
           >
             {sending || loading
               ? <ActivityIndicator color="#fff" size="small" />
-              : <ArrowUp size={17} color={disabled ? "#555" : "#fff"} strokeWidth={2.5} />
+              : <ArrowUp size={17} color={disabled ? "#a1a1aa" : "#fff"} strokeWidth={2.5} />
             }
           </TouchableOpacity>
         </View>
@@ -103,7 +103,9 @@ const s = StyleSheet.create({
   card: {
     flexDirection:   "row",
     alignItems:      "flex-end",
-    backgroundColor: "#1c1c1e",
+    backgroundColor: "#fff",
+    borderWidth:     1,
+    borderColor:     "#e4e4e7",
     borderRadius:    26,
     paddingLeft:     18,
     paddingRight:    8,
@@ -111,15 +113,15 @@ const s = StyleSheet.create({
     paddingBottom:   8,
     gap:             8,
     shadowColor:    "#000",
-    shadowOffset:   { width: 0, height: 4 },
-    shadowOpacity:  0.15,
-    shadowRadius:   12,
-    elevation:      8,
+    shadowOffset:   { width: 0, height: 2 },
+    shadowOpacity:  0.06,
+    shadowRadius:   8,
+    elevation:      3,
   },
   input: {
     flex:          1,
     fontSize:      16,
-    color:         "#f5f5f5",
+    color:         "#18181b",
     lineHeight:    22,
     maxHeight:     120,
     minHeight:     36,
@@ -130,12 +132,12 @@ const s = StyleSheet.create({
     width:           36,
     height:          36,
     borderRadius:    18,
-    backgroundColor: "#fff",
+    backgroundColor: "#18181b",
     alignItems:      "center",
     justifyContent:  "center",
     marginBottom:    1,
   },
   sendBtnDisabled: {
-    backgroundColor: "#3a3a3c",
+    backgroundColor: "#e4e4e7",
   },
 });

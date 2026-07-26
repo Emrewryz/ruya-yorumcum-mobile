@@ -3,7 +3,7 @@
  *
  * Kilidi açılmış tek sayfa tahlil raporu.
  * Yukarıdan aşağıya akan bölümler:
- *   1. Detaylı Tahlil  (islami + psikolojik ayrı alt başlıklarla)
+ *   1. Detaylı Tahlil  (tek blok, paragraf paragraf staggered fade-in)
  *   2. Semboller       (staggered animasyonlu liste)
  *   3. Kilit açıldı rozeti
  *
@@ -14,8 +14,32 @@ import { useEffect, useRef } from "react";
 import {
   View, Text, Animated, StyleSheet,
 } from "react-native";
-import { Brain, BookOpen, FileText, Moon, CheckCircle } from "lucide-react-native";
+import { Brain, Moon, CheckCircle } from "lucide-react-native";
 import type { AiResponse } from "@/app/index";   // paylaşılan tip
+
+// ─── Paragraf (staggered fade-in) ─────────────────────────────────────────────
+
+function Paragraph({ text, index }: { text: string; index: number }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const ty      = useRef(new Animated.Value(8)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 1, duration: 300, delay: index * 90, useNativeDriver: true,
+      }),
+      Animated.spring(ty, {
+        toValue: 0, tension: 90, friction: 16, delay: index * 90, useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.Text style={[r.bodyTxt, { opacity, transform: [{ translateY: ty }] }]}>
+      {text.trim()}
+    </Animated.Text>
+  );
+}
 
 // ─── Sembol Satırı ────────────────────────────────────────────────────────────
 
@@ -66,11 +90,7 @@ export default function ReportView({ ai }: Props) {
     ? ai.semboller.split("\n").filter((l) => l.trim())
     : [];
 
-  // Detaylı tahlil metni: islami + psiko varsa onları kullan, yoksa detayli_tahlil
-  const hasAyrinti = !!(ai.islami_analiz || ai.psikolojik_analiz);
-  const detayli    = !hasAyrinti
-    ? (ai.detayli_tahlil || "")
-    : "";
+  const paragraphs = (ai.detayli_tahlil || "").split("\n\n").filter((p) => p.trim());
 
   return (
     <View>
@@ -78,36 +98,10 @@ export default function ReportView({ ai }: Props) {
       {/* ── 1. Detaylı Tahlil ─────────────────────────────────────────── */}
       <View style={r.card}>
         <SectionHeader icon={Brain} title="DETAYLI RÜYA TAHLİLİ" />
+        <Text style={r.caption}>İslami tabir ve psikolojik yorum bir arada</Text>
 
-        {/* Ayrı bölümler: İslami */}
-        {ai.islami_analiz && (
-          <>
-            <View style={r.subHeader}>
-              <BookOpen size={12} color="#71717a" strokeWidth={1.5} />
-              <Text style={r.subTitle}>İslami Tabir</Text>
-            </View>
-            {ai.islami_analiz.split("\n\n").filter(Boolean).map((p, i) => (
-              <Text key={`islami-${i}`} style={r.bodyTxt}>{p.trim()}</Text>
-            ))}
-          </>
-        )}
-
-        {/* Ayrı bölümler: Psikolojik */}
-        {ai.psikolojik_analiz && (
-          <>
-            <View style={[r.subHeader, ai.islami_analiz ? { marginTop: 20 } : undefined]}>
-              <FileText size={12} color="#71717a" strokeWidth={1.5} />
-              <Text style={r.subTitle}>Psikolojik Analiz</Text>
-            </View>
-            {ai.psikolojik_analiz.split("\n\n").filter(Boolean).map((p, i) => (
-              <Text key={`psiko-${i}`} style={r.bodyTxt}>{p.trim()}</Text>
-            ))}
-          </>
-        )}
-
-        {/* Birleşik detayli_tahlil (ayrıntı yoksa) */}
-        {!hasAyrinti && detayli.split("\n\n").filter(Boolean).map((p, i) => (
-          <Text key={`detay-${i}`} style={r.bodyTxt}>{p.trim()}</Text>
+        {paragraphs.map((p, i) => (
+          <Paragraph key={i} text={p} index={i} />
         ))}
       </View>
 
@@ -155,9 +149,8 @@ const r = StyleSheet.create({
     fontSize: 10, fontWeight: "700", color: "#71717a", letterSpacing: 1.5,
   },
 
-  // Alt başlık (İslami / Psikolojik)
-  subHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 },
-  subTitle:  { fontSize: 12, fontWeight: "600", color: "#71717a" },
+  // Bölüm alt açıklaması
+  caption: { fontSize: 12, color: "#a1a1aa", marginBottom: 16 },
 
   // Paragraf
   bodyTxt: {

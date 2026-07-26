@@ -6,7 +6,7 @@
  * RevenueCat ile Google Play uygulama içi satın alım entegre edildi.
  */
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, Platform, ActivityIndicator, Alert
@@ -14,36 +14,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { X, Zap, Star, Crown, ShieldCheck, Gift } from "lucide-react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import { supabase } from "@/lib/supabase";
-import { adCooldownLabel, canWatchAd, recordAdWatch } from "@/lib/adUtils";
+import { useRewardedAd } from "@/lib/useRewardedAd";
 import Purchases from "react-native-purchases"; // RevenueCat eklendi
 
 // --- RevenueCat API Anahtarı ---
 const RC_API_KEY = "goog_eIBwqLHklzWSoXCWYzTzhlxTgBt";
-
-// ─── AdMob Güvenli İmport ─────────────────────────────────────────────────────
-
-let RewardedAd: any        = null;
-let RewardedAdEventType: any = null;
-let TestIds: any           = null;
-
-try {
-  const ads        = require("react-native-google-mobile-ads");
-  RewardedAd       = ads.RewardedAd;
-  RewardedAdEventType = ads.RewardedAdEventType;
-  TestIds          = ads.TestIds;
-} catch {}
-
-const REWARDED_ID = TestIds
-  ? (__DEV__ ? TestIds.REWARDED : (
-      Platform.OS === "ios"
-        ? "ca-app-pub-XXXX/YOUR_IOS_REWARDED"
-        : "ca-app-pub-1582674739139734/4581251133 "
-    ))
-  : "";
-
 
 // ─── Paketler (Google Play Product ID'leri ile) ───────────────────────────────
 
@@ -71,73 +48,7 @@ const PACKAGES = [
 // ─── Reklam İzle Bölümü ───────────────────────────────────────────────────────
 
 function AdRewardSection() {
-  const [adLoaded,    setAdLoaded]    = useState(false);
-  const [watching,    setWatching]    = useState(false);
-  const [cooldownLeft, setCooldown]   = useState<string | null>(null);
-  const adRef = useRef<any>(null);
-
-  const checkCooldown = useCallback(async () => {
-    const label = await adCooldownLabel();
-    setCooldown(label);
-  }, []);
-
-  useEffect(() => {
-    checkCooldown();
-    const interval = setInterval(checkCooldown, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    if (!RewardedAd || !REWARDED_ID) return;
-
-    const ad = RewardedAd.createForAdRequest(REWARDED_ID, {
-      requestNonPersonalizedAdsOnly: true,
-    });
-    adRef.current = ad;
-
-    const unsubLoaded = ad.addAdEventListener(
-      RewardedAdEventType.LOADED,
-      () => setAdLoaded(true),
-    );
-
-    const unsubEarned = ad.addAdEventListener(
-      RewardedAdEventType.EARNED_REWARD,
-      async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        await supabase.rpc("handle_credit_transaction", {
-          p_user_id:      user.id,
-          p_amount:       1,
-          p_process_type: "ad_reward",
-          p_description:  "Reklam ödülü",
-        });
-
-        await recordAdWatch();
-        setWatching(false);
-        setAdLoaded(false);
-        checkCooldown();
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-        ad.load();
-      },
-    );
-
-    ad.load();
-    return () => { unsubLoaded(); unsubEarned(); };
-  }, []);
-
-  const handleWatch = useCallback(async () => {
-    const ok = await canWatchAd();
-    if (!ok || cooldownLeft) { checkCooldown(); return; }
-    if (!RewardedAd || !REWARDED_ID) return;
-    if (!adLoaded || !adRef.current) return;
-    
-    setWatching(true);
-    adRef.current.show();
-  }, [adLoaded, cooldownLeft]);
-
-  const isDisabled = !!cooldownLeft || watching;
+  const { watching, cooldown: cooldownLeft, handleWatch, isDisabled } = useRewardedAd();
 
   return (
     <View style={adStyles.wrap}>

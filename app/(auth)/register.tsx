@@ -6,7 +6,8 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { Eye, EyeOff, Moon } from "lucide-react-native";
+import * as Linking from "expo-linking";
+import { Eye, EyeOff, Moon, Mail } from "lucide-react-native";
 import { supabase } from "@/lib/supabase";
 import { configureGoogle, signInWithGoogle } from "@/lib/googleAuth";
 
@@ -36,6 +37,7 @@ export default function RegisterScreen() {
   const [loading,    setLoading]    = useState(false);
   const [googleLoad, setGoogleLoad] = useState(false);
   const [error,      setError]      = useState<string | null>(null);
+  const [confirmSent, setConfirmSent] = useState(false);
 
   const handleRegister = async () => {
     Keyboard.dismiss();
@@ -43,11 +45,19 @@ export default function RegisterScreen() {
     if (password !== password2) { setError("Şifreler eşleşmiyor."); return; }
     if (password.length < 6)    { setError("Şifre en az 6 karakter olmalı."); return; }
     setLoading(true); setError(null);
-    const { error: e } = await supabase.auth.signUp({
+    const { data, error: e } = await supabase.auth.signUp({
       email: email.trim(), password,
+      options: { emailRedirectTo: Linking.createURL("/callback") },
     });
-    if (e) { setError(e.message); setLoading(false); return; }
-    router.replace("/onboarding");
+    setLoading(false);
+    if (e) { setError(e.message); return; }
+    // E-posta onayı açıksa signUp oturum döndürmez — kullanıcıyı
+    // onboarding'e atmak yerine onay bekleme ekranını göster.
+    if (data.session) {
+      router.replace("/onboarding");
+    } else {
+      setConfirmSent(true);
+    }
   };
 
   const handleGoogle = async () => {
@@ -61,6 +71,29 @@ export default function RegisterScreen() {
     // Yeni kullanıcıysa onboarding'e, mevcutsa ana sayfaya
     router.replace(result.isNewUser ? "/onboarding" : "/");
   };
+
+  if (confirmSent) {
+    return (
+      <SafeAreaView style={s.safe} edges={["top"]}>
+        <View style={cs.wrap}>
+          <View style={s.logoBox}>
+            <Mail size={28} color="#18181b" strokeWidth={1.5} />
+          </View>
+          <Text style={cs.title}>E-postanı kontrol et</Text>
+          <Text style={cs.sub}>
+            {email.trim()} adresine bir onay bağlantısı gönderdik.{"\n"}
+            Hesabını aktifleştirmek için e-postandaki bağlantıya dokun.
+          </Text>
+          <TouchableOpacity
+            onPress={() => router.replace("/(auth)/login")}
+            style={[s.submitBtn, { marginTop: 28, alignSelf: "stretch" }]}
+          >
+            <Text style={s.submitTxt}>Girişe Dön</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={s.safe} edges={["top"]}>
@@ -242,4 +275,10 @@ const s = StyleSheet.create({
   switchLink:  { fontSize: 14, fontWeight: "700", color: "#18181b" },
   terms:       { fontSize: 12, color: "#a1a1aa", textAlign: "center", lineHeight: 18 },
   termsLink:   { fontWeight: "600", color: "#52525b" },
+});
+
+const cs = StyleSheet.create({
+  wrap:  { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
+  title: { fontSize: 20, fontWeight: "800", color: "#18181b", marginTop: 20, marginBottom: 8, textAlign: "center" },
+  sub:   { fontSize: 14, color: "#71717a", textAlign: "center", lineHeight: 21 },
 });

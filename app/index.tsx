@@ -20,7 +20,14 @@ import ReportView                        from "@/components/ReportView";
 import HeaderAdButton                    from "@/components/HeaderAdButton";
 
 
-const EDGE_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/analyze-dream`;
+const EDGE_URL          = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/analyze-dream`;
+const FOLLOWUP_EDGE_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/follow-up`;
+
+const SUGGESTED_QUESTIONS = [
+  "Bu rüyanın hayatımdaki anlamı nedir?",
+  "Bu rüyayı tekrar görürsem ne yapmalıyım?",
+  "Rüyadaki semboller bana ne söylüyor?",
+];
 
 type Phase = "idle" | "loading" | "session";
 
@@ -314,22 +321,59 @@ export default function HomeScreen() {
     }
   }, [inputText, revealScroll, loadCredits]);
 
-  const handleSend = useCallback(async () => {
-    const msg = inputText.trim();
+  const handleSend = useCallback(async (overrideMsg?: string) => {
+    const msg = (overrideMsg ?? inputText).trim();
     if (!msg || msg.length < 3 || sending || !session) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: "user", content: msg }]);
-    setInputText(""); setSending(true);
+
+    const optimisticId = `u-${Date.now()}`;
+    setMessages((prev) => [...prev, { id: optimisticId, role: "user", content: msg }]);
+    setInputText(""); setSending(true); setError(null);
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150);
+
+    const rollback = () => {
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+      setInputText(msg);
+    };
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase.from("dream_chat_messages").insert({
-          dream_id: session.id, user_id: user.id, role: "user", content: msg,
-        });
+      const { data: { session: authSess } } = await supabase.auth.getSession();
+      if (!authSess) { rollback(); router.push("/(auth)/login"); return; }
+
+      const res = await fetch(FOLLOWUP_EDGE_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type":  "application/json",
+          "Authorization": `Bearer ${authSess.access_token}`,
+          "apikey":        process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "",
+        },
+        body: JSON.stringify({ dreamId: session.id, message: msg }),
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        rollback();
+        if (data.code === "NO_CREDIT") { router.push("/credit-shop"); return; }
+        if (data.code === "NO_AUTH")   { router.push("/(auth)/login"); return; }
+        setError(data.error ?? "Bir hata oluştu.");
+        return;
       }
-    } finally { setSending(false); }
-  }, [inputText, sending, session]);
+
+      setMessages((prev) => [
+        ...prev.filter((m) => m.id !== optimisticId),
+        { id: data.userMessage.id,      role: "user",      content: data.userMessage.content },
+        { id: data.assistantMessage.id, role: "assistant", content: data.assistantMessage.content },
+      ]);
+      await loadCredits();
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150);
+
+    } catch {
+      rollback();
+      setError("Sunucuya bağlanılamadı.");
+    } finally {
+      setSending(false);
+    }
+  }, [inputText, sending, session, loadCredits]);
 
   const ai      = session?.ai_response;
   const detayli = ai
@@ -416,7 +460,9 @@ export default function HomeScreen() {
                   </View>
                 </View>
 
-                {messages.map((msg) => <AnimatedMessage key={msg.id} msg={msg} />)}
+                {messages.map((msg) => (
+                  <AnimatedMessage key={msg.id} msg={msg} showLabel={msg.id === "teaser"} />
+                ))}
 
                 {!isUnlocked && (
                   <PaywallCard
@@ -430,6 +476,31 @@ export default function HomeScreen() {
                 )}
 
                 {isUnlocked && ai && <ReportView ai={ai} />}
+
+                {/* Hazır sorular — henüz follow-up yokken göster */}
+                {messages.length === 1 && !sending && (
+                  <View style={s.suggestWrap}>
+                    <Text style={s.suggestLabel}>Rüyanız hakkında merak ettiğiniz bir şey var mı?</Text>
+                    <View style={s.suggestRow}>
+                      {SUGGESTED_QUESTIONS.map((q) => (
+                        <TouchableOpacity
+                          key={q}
+                          onPress={() => handleSend(q)}
+                          activeOpacity={0.7}
+                          style={s.suggestChip}
+                        >
+                          <Text style={s.suggestChipTxt}>{q}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {error && (
+                  <View style={s.errorBox}>
+                    <Text style={s.errorTxt}>{error}</Text>
+                  </View>
+                )}
 
                 {sending && (
                   <View style={s.sendingWrap}>
@@ -447,7 +518,7 @@ export default function HomeScreen() {
           <FloatingInput
             value={inputText}
             onChange={setInputText}
-            onSend={phase === "idle" ? handleAnalyze : handleSend}
+            onSend={phase === "idle" ? handleAnalyze : () => handleSend()}
             canSend={inputText.trim().length >= (phase === "idle" ? 10 : 3)}
             sending={sending}
             loading={phase === "loading"}
@@ -479,4 +550,9 @@ const s = StyleSheet.create({
   dreamLabel:  { fontSize: 10, fontWeight: "700", color: "#a1a1aa", letterSpacing: 1.5, marginBottom: 8 },
   dreamTxt:    { fontSize: 14, color: "#71717a", lineHeight: 22, fontStyle: "italic" },
   sendingWrap: { paddingVertical: 16, alignItems: "flex-start" },
+  suggestWrap:    { marginTop: 4, marginBottom: 20 },
+  suggestLabel:   { fontSize: 12, color: "#a1a1aa", marginBottom: 10 },
+  suggestRow:     { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  suggestChip:    { borderWidth: 1, borderColor: "#e4e4e7", borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: "#fff" },
+  suggestChipTxt: { fontSize: 12.5, color: "#3f3f46" },
 });

@@ -7,7 +7,7 @@ export interface ChatMsg {
   content: string;
 }
 
-export default function AnimatedMessage({ msg }: { msg: ChatMsg }) {
+export default function AnimatedMessage({ msg, showLabel = false }: { msg: ChatMsg; showLabel?: boolean }) {
   const opacity = useRef(new Animated.Value(0)).current;
   const ty      = useRef(new Animated.Value(10)).current;
 
@@ -21,7 +21,7 @@ export default function AnimatedMessage({ msg }: { msg: ChatMsg }) {
   const isUser = msg.role === "user";
   return (
     <Animated.View style={{ opacity, transform: [{ translateY: ty }], marginBottom: 20 }}>
-      {!isUser && <Text style={s.label}>ANALİZ</Text>}
+      {!isUser && showLabel && <Text style={s.label}>ANALİZ</Text>}
       <View style={isUser ? s.userBubble : s.aiBubble}>
         <Text style={isUser ? s.userTxt : s.aiTxt}>{msg.content}</Text>
       </View>
@@ -31,8 +31,8 @@ export default function AnimatedMessage({ msg }: { msg: ChatMsg }) {
 
 const s = StyleSheet.create({
   label:      { fontSize: 10, fontWeight: "700", color: "#a1a1aa", letterSpacing: 1.5, marginBottom: 10 },
-  aiBubble:   {},
-  aiTxt:      { fontSize: 16, color: "#18181b", lineHeight: 28 },
+  aiBubble:   { backgroundColor: "#fff", borderWidth: 1, borderColor: "#e4e4e7", borderRadius: 18, borderBottomLeftRadius: 5, paddingHorizontal: 16, paddingVertical: 14 },
+  aiTxt:      { fontSize: 15, color: "#18181b", lineHeight: 25 },
   userBubble: { alignSelf: "flex-end", backgroundColor: "#18181b", borderRadius: 18, borderBottomRightRadius: 5, paddingHorizontal: 16, paddingVertical: 12, maxWidth: "82%" },
   userTxt:    { fontSize: 14, color: "#fff", lineHeight: 22 },
 });
